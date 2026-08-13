@@ -1,6 +1,8 @@
 mod dsl;
 mod planner;
 mod layout;
+mod llm;
+mod agent;
 
 use axum::{routing::{get, post}, Json, Router};
 use dsl::GenerateRequest;
@@ -17,6 +19,10 @@ async fn main() {
 }
 
 async fn generate(Json(req): Json<GenerateRequest>) -> Json<serde_json::Value> {
-    let deck = planner::create_plan(req.topic).await;
-    Json(serde_json::json!({"deck": deck}))
+    let deck = planner::create_plan(req.topic.clone()).await;
+    let outline = agent::outline::generate_outline(req.topic).await.ok();
+    Json(serde_json::json!({
+        "deck": deck,
+        "outline": outline
+    }))
 }
