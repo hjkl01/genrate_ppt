@@ -9,6 +9,7 @@ pub struct RepairRequest {
 pub fn api_routes() -> Vec<&'static str> {
     vec![
         "/api/slides",
+        "/api/slides/save",
         "/api/render",
         "/api/vision/check",
         "/api/repair",
