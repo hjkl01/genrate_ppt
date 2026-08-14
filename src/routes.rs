@@ -13,5 +13,7 @@ pub fn api_routes() -> Vec<&'static str> {
         "/api/render",
         "/api/vision/check",
         "/api/repair",
+        "/api/generate",
+        "/api/ai/chat",
     ]
 }
