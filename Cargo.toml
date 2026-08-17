@@ -5,6 +5,10 @@ edition = "2024"
 description = "Rust AI PPT generation engine"
 license = "MIT"
 
+[[bin]]
+name = "genrate-ppt"
+path = "main.rs"
+
 [dependencies]
 anyhow = "1"
 axum = "0.8"
