@@ -1,6 +1,5 @@
 mod agent;
 mod dsl;
-mod layout;
 mod llm;
 mod planner;
 
@@ -22,8 +21,9 @@ async fn main() {
 async fn generate(Json(req): Json<GenerateRequest>) -> Json<serde_json::Value> {
     let request = PipelineRequest {
         topic: req.topic,
-        audience: None,
-        slide_count: 8,
+        audience: req.audience,
+        style: req.style,
+        slide_count: req.slide_count,
         repair_rounds: 1,
     };
 
