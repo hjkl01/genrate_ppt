@@ -1,13 +1,15 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::agent::{outline, AgentContext};
+use crate::{dsl::{GenerateRequest, PresentationSpec}, llm::LlmClient, planner};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineRequest {
     pub topic: String,
     #[serde(default)]
     pub audience: Option<String>,
+    #[serde(default)]
+    pub style: Option<String>,
     #[serde(default = "default_slide_count")]
     pub slide_count: usize,
     #[serde(default)]
@@ -20,37 +22,39 @@ fn default_slide_count() -> usize { 8 }
 pub struct PipelineResult {
     pub stage: String,
     pub topic: String,
-    pub outline: String,
+    pub spec: PresentationSpec,
     pub feedback: Vec<String>,
 }
 
-/// Coordinates the presentation workflow without coupling agents to HTTP or PPTX.
-/// Each stage can later be replaced by a stronger implementation (structured LLM,
-/// renderer, vision model, or repair agent) without changing the API layer.
 pub async fn run(request: PipelineRequest) -> Result<PipelineResult> {
     let topic = request.topic.trim().to_string();
-    if topic.is_empty() {
-        return Err(anyhow!("topic is required"));
-    }
-    if !(1..=100).contains(&request.slide_count) {
-        return Err(anyhow!("slide_count must be between 1 and 100"));
+    if topic.is_empty() { return Err(anyhow!("topic is required")); }
+    if !(1..=100).contains(&request.slide_count) { return Err(anyhow!("slide_count must be between 1 and 100")); }
+
+    let llm = LlmClient::from_env()?;
+    let input = GenerateRequest {
+        topic: topic.clone(),
+        audience: request.audience,
+        style: request.style,
+        slide_count: request.slide_count,
+    };
+    let mut feedback = Vec::new();
+    let mut spec = None;
+
+    for attempt in 0..=request.repair_rounds {
+        match planner::plan(&llm, &input, &feedback).await {
+            Ok(candidate) => {
+                spec = Some(candidate);
+                break;
+            }
+            Err(error) if attempt < request.repair_rounds => {
+                feedback.push(format!("planner attempt {} failed validation: {error}", attempt + 1));
+            }
+            Err(error) => return Err(error),
+        }
     }
 
-    let mut context = AgentContext { topic: topic.clone(), feedback: Vec::new() };
-    let outline_text = outline::generate_outline(topic.clone()).await?;
-
-    // Keep the orchestration state explicit. The next stage consumes this context
-    // and produces a semantic slide DSL rather than directly emitting PPTX bytes.
-    context.feedback.push(format!("outline generated for {} slides", request.slide_count));
-    if let Some(audience) = request.audience.as_deref().filter(|v| !v.trim().is_empty()) {
-        context.feedback.push(format!("target audience: {audience}"));
-    }
-
-    let stage = if request.repair_rounds > 0 { "planned_with_repair_budget" } else { "planned" };
-    Ok(PipelineResult {
-        stage: stage.into(),
-        topic: context.topic,
-        outline: outline_text,
-        feedback: context.feedback,
-    })
+    let spec = spec.ok_or_else(|| anyhow!("planner produced no presentation spec"))?;
+    feedback.push(format!("semantic DSL validated: {} slides", spec.slides.len()));
+    Ok(PipelineResult { stage: "semantic_plan_ready".into(), topic, spec, feedback })
 }
