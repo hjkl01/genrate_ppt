@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
 CARGO ?= cargo
-NPM ?= npm
+PNPM ?= pnpm
 PORT ?= 8080
 FRONTEND_DIR ?= frontend
 FRONTEND_PORT ?= 5173
@@ -10,33 +10,27 @@ FRONTEND_PORT ?= 5173
 
 help:
 	@echo "Rust + React AI PPT engine"
-	@echo ""
 	@echo "  make setup          Install backend and frontend dependencies"
 	@echo "  make install        Alias for setup"
-	@echo "  make build         Build backend and frontend"
-	@echo "  make build-backend Build Rust release binary"
+	@echo "  make build          Build backend and frontend"
+	@echo "  make build-backend  Build Rust release binary"
 	@echo "  make build-frontend Build React production bundle"
 	@echo "  make check         Check Rust code"
 	@echo "  make test          Run backend and frontend tests"
-	@echo "  make test-backend  Run Rust tests"
-	@echo "  make test-frontend Run frontend tests if configured"
 	@echo "  make fmt            Format Rust code"
 	@echo "  make fmt-check      Check Rust formatting"
 	@echo "  make clippy         Run Rust Clippy"
-	@echo "  make lint           Run backend and frontend lint checks"
+	@echo "  make lint           Run backend and frontend lint"
 	@echo "  make run            Start backend"
 	@echo "  make dev            Start backend and frontend together"
 	@echo "  make dev-backend    Start backend only"
 	@echo "  make dev-frontend   Start frontend only"
 	@echo "  make api            Check backend health"
-	@echo "  make clean          Remove backend and frontend build artifacts"
-	@echo "  make docker-build   Build Docker image"
-	@echo "  make docker-up      Start Docker Compose services"
-	@echo "  make docker-down    Stop Docker Compose services"
+	@echo "  make clean          Remove build artifacts"
 
 setup:
 	$(CARGO) fetch
-	cd $(FRONTEND_DIR) && $(NPM) install
+	cd $(FRONTEND_DIR) && $(PNPM) install
 
 install: setup
 
@@ -46,7 +40,7 @@ build-backend:
 	$(CARGO) build --release
 
 build-frontend:
-	cd $(FRONTEND_DIR) && $(NPM) run build
+	cd $(FRONTEND_DIR) && $(PNPM) build
 
 check:
 	$(CARGO) check --all-targets --all-features
@@ -57,7 +51,7 @@ test-backend:
 	$(CARGO) test --all-targets --all-features
 
 test-frontend:
-	@cd $(FRONTEND_DIR) && if $(NPM) run | grep -qE '(^|[[:space:]])test([[:space:]]|$$)'; then $(NPM) test; else echo "No frontend test script configured; skipping."; fi
+	cd $(FRONTEND_DIR) && $(PNPM) test
 
 fmt:
 	$(CARGO) fmt --all
@@ -69,22 +63,23 @@ clippy:
 	$(CARGO) clippy --all-targets --all-features -- -D warnings
 
 lint: clippy
-	@cd $(FRONTEND_DIR) && if $(NPM) run | grep -qE '(^|[[:space:]])lint([[:space:]]|$$)'; then $(NPM) run lint; else echo "No frontend lint script configured; skipping."; fi
+	cd $(FRONTEND_DIR) && $(PNPM) lint
 
 run:
 	$(CARGO) run
 
-dev: dev-backend dev-frontend
+dev:
+	@set -m; \
+	$(CARGO) run & backend_pid=$$!; \
+	(cd $(FRONTEND_DIR) && $(PNPM) dev --host 0.0.0.0 --port $(FRONTEND_PORT)) & frontend_pid=$$!; \
+	trap 'kill $$backend_pid $$frontend_pid 2>/dev/null || true' INT TERM EXIT; \
+	wait $$backend_pid $$frontend_pid
 
-# Run both development servers. Requires a POSIX shell with background-job support.
 dev-backend:
-	@RUST_LOG=$${RUST_LOG:-debug} RUST_BACKTRACE=$${RUST_BACKTRACE:-1} $(CARGO) run & \
-	backend_pid=$$!; \
-	trap 'kill $$backend_pid 2>/dev/null || true' INT TERM EXIT; \
-	cd $(FRONTEND_DIR) && $(NPM) run dev -- --host 0.0.0.0 --port $(FRONTEND_PORT)
+	RUST_LOG=$${RUST_LOG:-debug} RUST_BACKTRACE=$${RUST_BACKTRACE:-1} $(CARGO) run
 
 dev-frontend:
-	cd $(FRONTEND_DIR) && $(NPM) run dev -- --host 0.0.0.0 --port $(FRONTEND_PORT)
+	cd $(FRONTEND_DIR) && $(PNPM) dev --host 0.0.0.0 --port $(FRONTEND_PORT)
 
 api:
 	@curl -fsS http://127.0.0.1:$(PORT)/health
