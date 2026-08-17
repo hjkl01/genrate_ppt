@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,16 +14,16 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "react": "latest",
-    "react-dom": "latest",
-    "zustand": "latest"
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "zustand": "5.0.8"
   },
   "devDependencies": {
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "typescript": "latest",
-    "vite": "latest",
-    "vitest": "latest",
-    "@vitejs/plugin-react": "latest"
+    "@types/react": "19.1.10",
+    "@types/react-dom": "19.1.7",
+    "@vitejs/plugin-react": "6.0.4",
+    "typescript": "5.9.2",
+    "vite": "8.2.0",
+    "vitest": "3.2.4"
   }
 }
